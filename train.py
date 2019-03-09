@@ -6,14 +6,15 @@ from warpctc_pytorch import CTCLoss
 from model.crnn import crnn
 from dataset import load_data
 from utils import *
+from torchsummary import summary
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--root', type=str, default='/workspace/xzj/datasets/IIIT5K', help='path to the dataset')
-parser.add_argument('--batch_size', type=int, default=64, help = 'input batch size')
+parser.add_argument('--batch_size', type=int, default=128, help = 'input batch size')
 parser.add_argument('--se', type=int, default=0, help='starting epoch')
 parser.add_argument('--epoch', type=int, default=20, help='number of epoch to train(default=20)')
 parser.add_argument('--lr', type=float, default=0.1, help='learning rate')
-parser.add_argument('--saveInterval', type=int, default=500, help='Interval the model to be saved')
+parser.add_argument('--saveInterval', type=int, default=5, help='Interval the model to be saved')
 parser.add_argument('--pretrained',default='', help='path to pretrained model(continuing training)')
 parser.add_argument('--exp_dir', default='exp', help='folder to store samples and model')
 parser.add_argument('--alphabet', type=str, default='ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789')
@@ -23,6 +24,9 @@ print(opt)
 # dir to save model
 if not os.path.exists(opt.exp_dir):
     os.mkdir(opt.exp_dir)
+
+# cuda devices
+os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
 # custom weight initialize
 def weight_init(m):
@@ -34,9 +38,10 @@ def weight_init(m):
         m.bias.data.fill_(0)
 
 def train(epoch_num, start_epoch=0, preTrained=opt.pretrained,
-          lr=0.1, print_every=500):
+          lr=0.1, print_every=8):
 
     train_loader = load_data(opt.root, batch_size=opt.batch_size)
+    print(len(train_loader))
     print('successfully load data')
     assert train_loader
 
@@ -47,7 +52,7 @@ def train(epoch_num, start_epoch=0, preTrained=opt.pretrained,
         print('loading Pre_trained model from %s' % preTrained)
         net.load_state_dict(torch.load(preTrained))
         print('Successfully load Pre_trained Model')
-    print(net)
+    # print(net)
 
     # loss func
     criterion = CTCLoss()
@@ -62,20 +67,24 @@ def train(epoch_num, start_epoch=0, preTrained=opt.pretrained,
         criterion = criterion.to(device)
     else:
         print('*** cuda is not available, switch to cpu ***')
+    # summary(net, input_size=(1, 32, 100))
 
     label_encoder = str2LabelConverter(opt.alphabet) # initialize encoder and decoder
 
     print('===Start training...===')
     net.train() #
     for e in range(start_epoch, epoch_num):
-        print('-------  epoch: %d  ------'% e)
+        print('-------  epoch: %d  ------'% (e + 1))
         for idx, (img, label) in enumerate(train_loader):
             labelEncoded, label_length = label_encoder.encode(label)
             img = img.to(device)
+            if e == 0 and idx == 0:
+                print('input shape = {0}, {1}, {2}, {3}'.format(*(img.size())) )
+
             optimizer.zero_grad()
             pre = net(img) # batch of predicted texts
             pre_length = torch.IntTensor(
-                [pre.size(0)] * pre.size[1]
+                [pre.size(0)] * pre.size(1)
             ) # pre_length [n]
             loss = criterion(pre, labelEncoded, pre_length, label_length)
             # update
@@ -85,10 +94,10 @@ def train(epoch_num, start_epoch=0, preTrained=opt.pretrained,
             if idx % print_every == 0:
                 print('Iteration %d, loss = %.4f' % (idx, loss))
 
-            if idx % opt.saveInterval == 0:
-                torch.save(
-                    net.state_dict(), '{0}/netCRNN_{1}_{2}.pth'.format(opt.exp_dir, e, idx)
-                )
+        if e % opt.saveInterval == 0:
+            torch.save(
+                net.state_dict(), '{0}/CRNN_{1}.pth'.format(opt.exp_dir, e)
+            )
 
     print('Finished Training!')
     torch.save(net.state_dict(),'{0}/CRNN_Final'.format(opt.exp_dir))

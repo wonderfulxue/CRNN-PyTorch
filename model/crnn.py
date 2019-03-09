@@ -37,8 +37,9 @@ class crnn(nn.Module):
                           (3, 1, 1), (3, 1, 1), (3, 1, 1),
                             (3, 1, 1), (2, 1, 0))
         # pooling layer structure
-        self.pool_params = ((2, 2), (2, 2), None, (2, 1),
-                            None, (2, 1), None)
+        self.pool_params = ((2, 2), (2, 2), None,
+                            [(2, 2), (2, 1), (0, 1)], None,
+                            [(2, 2), (2, 1), (0, 1)], None)
         # net_structure
         self.net_params = (64, 128, 256, 256, 512, 512, 512)
         # init cnn model
@@ -72,10 +73,10 @@ class crnn(nn.Module):
 
     def build(self):
         self.convRelu(0)
-        self.pooling(0)
+        self.pooling(0) # 64*16*50
 
         self.convRelu(1)
-        self.pooling(1)
+        self.pooling(1) # 128*8*25
 
         self.convRelu(2)
 
@@ -97,7 +98,8 @@ class crnn(nn.Module):
     def forward(self, input): # input: height=32, width>=100
         conv_out = self.cnn(input) # batch, channel=512, height=1, widths>=24
         b, c, h, w = conv_out.size()
-        assert h == 1, "the output height of cnn must be 1"
+
+        assert h == 1, "the output height of cnn must be 1, got shape:b:{} c:{} h:{} w:{}".format(b, c, h, w)
 
         # feature sequence extraction from feature maps
         # each feature vector of a feature sequence is generated from left to right on the feature maps by column

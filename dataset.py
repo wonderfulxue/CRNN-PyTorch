@@ -52,7 +52,7 @@ class IIIT5k(Dataset):
         return img, img_label
 
 
-def load_data(root_dir=None, training=True, batch_size=64):
+def load_data(root_dir=None, training=True, batch_size=128):
     """
     load IIIT-5K dataset
     :param root_dir: root dir of the dataset
@@ -68,8 +68,10 @@ def load_data(root_dir=None, training=True, batch_size=64):
             print('==== Loading data... ===')
             dataset = IIIT5k(root_dir)
             pickle.dump(dataset, open(filename, 'wb'))
+
         dataLoader = DataLoader(dataset, batch_size=batch_size,
                                 shuffle=True, num_workers=4)
+
 
     else:
         filename = os.path.join(root_dir, 'test' + '.pkl')
